@@ -38,6 +38,9 @@ type Deck struct {
 
 	// length info
 	length time.Duration
+	
+	// track if streamer has been added to speaker
+	addedToSpeaker bool
 }
 
 func NewEngine(pathA, pathB string) (*Engine, error) {
@@ -102,6 +105,11 @@ func loadDeck(path string) (*Deck, error) {
 		length:   length,
 	}
 
+	// Add the streamer to the speaker once when deck is created
+	// This prevents multiple streams from being added on play/pause
+	speaker.Play(ctrl)
+	d.addedToSpeaker = true
+	
 	// start a background goroutine to sample RMS (non-blocking)
 	go d.rmsSampler()
 
@@ -115,11 +123,12 @@ func (d *Deck) Play() {
 	
 	if !d.playing {
 		d.playing = true
-		// Resume playback by seeking to current position
+		// Resume playback by unpausing the control streamer
 		if d.ctrl.Paused {
 			d.ctrl.Paused = false
 		}
-		speaker.Play(d.ctrl)
+		// The streamer is already added to the speaker in loadDeck
+		// We just need to unpause it
 	}
 }
 
@@ -139,6 +148,67 @@ func (d *Deck) Toggle() {
 	} else {
 		d.Play()
 	}
+}
+
+// Stop completely stops the deck and removes it from the speaker
+func (d *Deck) Stop() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
+	if d.playing {
+		d.playing = false
+		d.ctrl.Paused = true
+	}
+	
+	// Note: In beep, we can't easily remove individual streams
+	// The stream will remain in the speaker but paused
+	// This is a limitation of the beep library
+}
+
+// Reset resets the deck to the beginning and pauses it
+func (d *Deck) Reset() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
+	d.playing = false
+	d.ctrl.Paused = true
+	d.streamer.Seek(0)
+}
+
+// IsFinished checks if the deck has reached the end
+func (d *Deck) IsFinished() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
+	if d.streamer == nil {
+		return true
+	}
+	
+	// Check if we've reached the end of the stream
+	return d.streamer.Position() >= d.streamer.Len()
+}
+
+// Restart restarts the deck from the beginning
+func (d *Deck) Restart() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
+	d.streamer.Seek(0)
+	d.playing = false
+	d.ctrl.Paused = true
+}
+
+// GetPlaybackState returns debug info about the current playback state
+func (d *Deck) GetPlaybackState() string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
+	if d.streamer == nil {
+		return "No streamer"
+	}
+	
+	return fmt.Sprintf("Playing: %v, Paused: %v, Position: %d/%d, AddedToSpeaker: %v",
+		d.playing, d.ctrl.Paused, d.streamer.Position(), d.streamer.Len(), d.addedToSpeaker)
 }
 
 func (d *Deck) SetSpeed(r float64) {

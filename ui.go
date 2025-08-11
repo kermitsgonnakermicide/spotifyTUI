@@ -100,6 +100,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.msg = "Deck B: Volume increased"
 			}
 
+		// Additional controls for testing fixed functionality
+		case "r":
+			if m.engine != nil && m.engine.deckA != nil {
+				m.engine.deckA.Restart()
+				m.msg = "Deck A: Restarted from beginning"
+			}
+		case "shift+r":
+			if m.engine != nil && m.engine.deckB != nil {
+				m.engine.deckB.Restart()
+				m.msg = "Deck B: Restarted from beginning"
+			}
+		case "t":
+			if m.engine != nil && m.engine.deckA != nil {
+				m.engine.deckA.Reset()
+				m.msg = "Deck A: Reset to beginning"
+			}
+		case "shift+t":
+			if m.engine != nil && m.engine.deckB != nil {
+				m.engine.deckB.Reset()
+				m.msg = "Deck B: Reset to beginning"
+			}
+
 		// crossfade
 		case "f":
 			if m.engine != nil {
@@ -234,6 +256,7 @@ sb.WriteString(`
 	|____/ \___/    |_|  \___/|___| a+←/→ Fine A 1s   k+←/→ Fine B 1s
 	|____/ \___/    |_|  \___/|___| Shift+a+←/→ Coarse A 10s   Shift+k+←/→ Coarse B 10s
 	|____/ \___/    |_|  \___/|___| Home/End A   Shift+Home/End B
+	|____/ \___/    |_|  \___/|___| r/Shift+r Restart A/B   t/Shift+t Reset A/B
 	|____/ \___/    |_|  \___/|___| F1/F2 EQ presets
 `)
 
